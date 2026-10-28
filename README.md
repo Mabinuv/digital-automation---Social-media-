@@ -1,4 +1,3 @@
-# digital-automation---Social-media-
 # Social Automation – n8n workflow (template)
 
 Daily n8n workflow: reads a brief from Google Sheets → analyses two reference posts with Gemini → generates an image (Gemini image model, optional OpenAI branch) → writes Instagram + Facebook captions → emails you a preview with **Approve / Regenerate** links → on approval, schedules one image post per day on Instagram and Facebook via Blotato.
