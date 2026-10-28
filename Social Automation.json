@@ -1,0 +1,2611 @@
+{
+  "name": "Social Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 11 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0dad4cbd-e8f7-4184-8e90-dd215563be16",
+      "name": "Daily Trigger 11:30 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2512,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "status",
+              "lookupValue": "pending"
+            },
+            {
+              "lookupColumn": "date",
+              "lookupValue": "={{ $today.toFormat('yyyy-MM-dd') }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "id": "6ddbaa4d-692f-4837-9ef6-416faac3662a",
+      "name": "Read Today's Brief",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2288,
+        336
+      ],
+      "alwaysOutputData": false,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-brief",
+              "leftValue": "={{ $json.primary_subject }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "52dc2795-b447-4b6a-99a9-8cce19840e75",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d60bd90b-814b-4154-845a-dc94a535b016",
+      "name": "Brief Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2064,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.reference_post_1 }}",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "options": {}
+      },
+      "id": "35d64113-2b23-44d5-a431-dc7b75df090f",
+      "name": "Download Ref Post 1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1840,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $node[\"Read Today's Brief\"].json.reference_post_2.match(/[-\\w]{25,}/)[0] }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "1003f000-3384-4566-8edb-d94ae3608a86",
+      "name": "Download Ref Post 2",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1392,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $node[\"Read Today's Brief\"].json.logo_url.match(/[-\\w]{25,}/)[0] }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "eb1ed868-dc89-4ae8-a47e-266b07f292a8",
+      "name": "Download Logo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -944,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const brief = $(\"Read Today's Brief\").first().json;\n\nfunction pullFromExtract(nodeName) {\n  const item = $(nodeName).first();\n  const base64 = item.json.base64_data || item.json.data;\n  const mime = item.json.mimeType \n            || item.binary?.data?.mimeType \n            || 'image/png';\n  if (!base64) {\n    throw new Error(`${nodeName} did not produce base64_data. Check the Extract node's Destination Key.`);\n  }\n  return { base64, mime };\n}\n\nconst ref1 = pullFromExtract('Extract Ref 1');\nconst ref2 = pullFromExtract('Extract Ref 2');\nconst logo = pullFromExtract('Extract Logo');\n\nreturn [{\n  json: {\n    brief,\n    ref1_base64: ref1.base64, ref1_mime: ref1.mime,\n    ref2_base64: ref2.base64, ref2_mime: ref2.mime,\n    logo_base64: logo.base64, logo_mime: logo.mime,\n  }\n}];"
+      },
+      "id": "19e79117-98fe-4096-a495-39dcc2e99ca9",
+      "name": "Prepare Image Payloads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [\n      {\n        \"text\": \"You are a senior social media creative director for YOUR_BRAND (YOUR_DOMAIN).\\n\\nABOUT YOUR_BRAND:\\n- YOUR_PRODUCT_DESCRIPTION\\n- YOUR_TAGLINES\\n- YOUR_BRAND_VALUES\\n- YOUR_EMOTIONAL_CORE\\n- YOUR_TARGET_AUDIENCE\\n- YOUR_BRAND_POSITIONING\\n\\nYou are analysing 2 reference Instagram posts from YOUR_BRAND's feed. Your job is two-fold:\\n1. Extract what is visually CONSISTENT and on-brand across both posts.\\n2. Recommend creative upgrades that make the next post more scroll-stopping in 2026-2027 while staying true to YOUR_BRAND: YOUR_BRAND_PERSONALITY.\\n\\nSTRICT CONSTRAINTS:\\n- Do NOT invent brand colors that are not visible in the reference images.\\n- Do NOT name fonts unless the typeface is clearly legible in the image.\\n- Do NOT copy or replicate the layout of the reference posts; extract essence only.\\n- Recommended upgrades must EXTEND the existing brand palette, not replace it.\\n- Avoid anything that does not fit the brand: YOUR_AESTHETICS_TO_AVOID.\\n- Human subjects: YOUR_SUBJECT_GUIDELINES.\\n- Brand motifs: YOUR_BRAND_MOTIFS. Recommend at most two per post.\\n\\nOutput strict JSON only. No markdown fences, no preamble, no explanation outside the JSON:\\n{\\n  \\\"extracted_style\\\": {\\n    \\\"color_palette\\\": [\\\"#hex\\\", \\\"#hex\\\", \\\"#hex\\\"],\\n    \\\"dominant_mood\\\": \\\"e.g. warm-friendly, playful-adventurous, calm-reassuring\\\",\\n    \\\"typography_style\\\": \\\"observed font weight, hierarchy and approximate style, only what is clearly visible\\\",\\n    \\\"headline_position\\\": \\\"top | center | bottom\\\",\\n    \\\"logo_position\\\": \\\"top-left | top-right | bottom-left | bottom-right | center\\\",\\n    \\\"image_to_text_ratio\\\": \\\"e.g. 70% image, 30% text\\\",\\n    \\\"overlay_style\\\": \\\"text on image directly | text on panel | text in separate zone\\\",\\n    \\\"cta_style\\\": \\\"button | text-only | sticker | none\\\",\\n    \\\"imagery_style\\\": \\\"photographic | illustrated | gradient | flat-graphic | mixed\\\",\\n    \\\"human_subject_style\\\": \\\"who appears (solo, pair, group, none), expressions and setting\\\",\\n    \\\"travel_motifs_used\\\": [\\\"brand motifs seen, e.g. YOUR_MOTIF_EXAMPLES\\\"],\\n    \\\"text_density\\\": \\\"minimal | moderate | dense\\\",\\n    \\\"format\\\": \\\"feed-square | feed-portrait | story | reel-cover\\\",\\n    \\\"recurring_elements\\\": [\\\"motifs, badges, shapes, icons consistently seen across both posts\\\"]\\n  },\\n  \\\"creative_upgrades\\\": {\\n    \\\"suggested_color_palette\\\": [\\\"#hex derived from extracted palette\\\", \\\"#hex extended accent\\\", \\\"#hex contrast tone\\\", \\\"#hex neutral\\\"],\\n    \\\"color_rationale\\\": \\\"how these extend the existing palette to feel more on-brand on Instagram\\\",\\n    \\\"typography_upgrade\\\": \\\"specific font pairing, e.g. rounded bold display + clean sans, that feels friendly and modern and complements the observed style\\\",\\n    \\\"layout_upgrade\\\": \\\"one specific layout improvement, e.g. YOUR_LAYOUT_EXAMPLE\\\",\\n    \\\"visual_trend\\\": \\\"the single most recommended 2026 trend for YOUR_BRAND, e.g. candid film-grain photography, soft liquid-glass cards, hand-drawn doodles over photos\\\",\\n    \\\"visual_trend_alternatives\\\": [\\\"fallback trend if the primary is too complex\\\", \\\"minimal safe option\\\"],\\n    \\\"mood_upgrade\\\": \\\"upgraded mood descriptor, e.g. YOUR_MOOD_EXAMPLE\\\",\\n    \\\"background_style\\\": \\\"specific background that fits the brand, e.g. YOUR_BACKGROUND_EXAMPLE\\\",\\n    \\\"depth_technique\\\": \\\"layering technique, e.g. frosted glass card over a soft blurred background\\\",\\n    \\\"cta_upgrade\\\": \\\"specific CTA style, e.g. rounded pill button with YOUR_CTA_TEXT\\\"\\n  },\\n  \\\"final_design_direction\\\": \\\"2-3 sentences ONLY. Must cover: (1) brand colors and mood rooted in the extracted identity and YOUR_BRAND_FEELING, (2) subject composition that fits YOUR_BRAND_SUBJECT plus where headline and logo sit, (3) one specific 2026 design trend to apply. This is the master direction passed to image generation, so be precise and actionable.\\\"\\n}\"\n      },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"{{ $json.ref1_mime }}\",\n          \"data\": \"{{ $json.ref1_base64 }}\"\n        }\n      },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"{{ $json.ref2_mime }}\",\n          \"data\": \"{{ $json.ref2_base64 }}\"\n        }\n      }\n    ]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.4,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {}
+      },
+      "id": "39b1d4ae-da07-4635-9369-f4970747c97d",
+      "name": "Gemini: Extract Style Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        336
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini's style profile output and merge with the brief\nconst styleText = $input.first().json.candidates[0].content.parts[0].text;\nconst styleProfile = JSON.parse(styleText);\nconst payloads = $('Prepare Image Payloads').first().json;\n\nreturn [{\n  json: {\n    brief: payloads.brief,\n    style_profile: styleProfile,\n    style_profile_json_string: JSON.stringify(styleProfile),\n    logo_base64: payloads.logo_base64,\n    logo_mime: payloads.logo_mime\n  }\n}];"
+      },
+      "id": "0fc88506-b667-4661-a993-a12514c1e2d6",
+      "name": "Parse Style Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.request_body }}",
+        "options": {}
+      },
+      "id": "0cd590af-aab7-4b65-a2e1-3691ac050c90",
+      "name": "Nano Banana: Generate Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        432
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.filename }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_DRIVE_FOLDER_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "d51876f7-2dc5-4b61-aa42-4af0155e05d0",
+      "name": "Upload Image to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.request_body }}",
+        "options": {}
+      },
+      "id": "2de2ad1a-4868-4ab7-b2ab-c46825535c03",
+      "name": "Gemini: Generate Captions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        336
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read the captions response by node name, not from $input\nlet response;\ntry {\n  response = $('Gemini: Generate Captions').first().json;\n} catch (e) {\n  throw new Error('Gemini: Generate Captions has not run in this execution. Run the workflow from the trigger, not this node alone.');\n}\n\nif (!response.candidates || !response.candidates[0]) {\n  throw new Error(`Gemini Captions failed: ${JSON.stringify(response).slice(0, 500)}`);\n}\n\n// Gemini sometimes wraps JSON in ```json fences despite instructions\nconst captionText = response.candidates[0].content.parts[0].text\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\nconst captions = JSON.parse(captionText);\n\nconst brief = $(\"Read Today's Brief\").first().json;\n\n// ─── Hashtags from the sheet ───────────────────────────────────────────────\nconst hashtags = String(brief.hashtags || '')\n  .split(/[\\s,]+/)\n  .map(t => t.trim())\n  .filter(Boolean)\n  .map(t => (t.startsWith('#') ? t : `#${t}`))\n  .join(' ');\n\nconst withTags = (text) => {\n  const clean = String(text || '').trim();\n  return hashtags ? `${clean}\\n\\n${hashtags}` : clean;\n};\n\n// ─── Image source (OpenAI or Nano Banana) ──────────────────────────────────\nconst imageModel = brief.image_model || 'nano_banana';\n\nconst imageNode = imageModel === 'openai'\n  ? $('Extract Gen openai Image').first().json\n  : $('Extract Gen Gemini Image').first().json;\n\nconst uploadNode = $('Upload Image to Drive').first().json;\nconst publicUrl = `https://drive.google.com/uc?export=view&id=${uploadNode.id}`;\n\n// ─── Output ────────────────────────────────────────────────────────────────\nreturn [{\n  json: {\n    row_number: imageNode.brief.row_number,\n    'post#': brief['post#'],\n    date: imageNode.today,\n    primary_subject: imageNode.brief.primary_subject,\n    generated_image_url: publicUrl,\n    instagram_caption: withTags(captions.instagram_caption),\n    facebook_caption: withTags(captions.facebook_caption),\n    alt_text: captions.alt_text,\n    hashtags,\n    style_profile_json: imageNode.style_profile_json_string,\n    image_model: imageModel,\n    status: 'generated'\n  }\n}];"
+      },
+      "id": "92ef89e0-0d35-48ff-bb84-314fc3b4810f",
+      "name": "Consolidate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_image_url": "={{ $json.generated_image_url }}",
+            "post#": "={{ $('Brief Exists?').item.json['post#'] }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "facebook_caption": "={{ $json.facebook_caption }}",
+            "alt_text": "={{ $json.alt_text }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "post#"
+          ],
+          "schema": [
+            {
+              "id": "post#",
+              "displayName": "post#",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_IST",
+              "displayName": "posting_date_IST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_UTC",
+              "displayName": "posting_date_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "topic_type",
+              "displayName": "topic_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "primary_subject",
+              "displayName": "primary_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "key_facts",
+              "displayName": "key_facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cta",
+              "displayName": "cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "priceHook",
+              "displayName": "priceHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outcomeHook",
+              "displayName": "outcomeHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tone",
+              "displayName": "tone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "image_model",
+              "displayName": "image_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_1",
+              "displayName": "reference_post_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_2",
+              "displayName": "reference_post_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "logo_url",
+              "displayName": "logo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "generated_image_url",
+              "displayName": "generated_image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "instagram_caption",
+              "displayName": "instagram_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "facebook_caption",
+              "displayName": "facebook_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "alt_text",
+              "displayName": "alt_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "style_profile_json",
+              "displayName": "style_profile_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ig_post_url",
+              "displayName": "ig_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "facebook_post_url",
+              "displayName": "facebook_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_log",
+              "displayName": "error_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hashtags",
+              "displayName": "hashtags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6582c07f-317e-48f5-80b3-04ee440b7ac6",
+      "name": "Write Back to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1968,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "base64_data",
+        "options": {
+          "encoding": "base64"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1616,
+        336
+      ],
+      "id": "6f0b2b77-8478-418f-8bea-899e8f7000b5",
+      "name": "Extract Ref 1"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "base64_data",
+        "options": {
+          "encoding": "base64"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1168,
+        336
+      ],
+      "id": "a8106294-1e24-43df-bc65-2523a0599848",
+      "name": "Extract Ref 2"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "base64_data",
+        "options": {
+          "encoding": "base64"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        336
+      ],
+      "id": "a8bcf9cc-b07f-45e7-bcc8-06060284b9ee",
+      "name": "Extract Logo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst brief = input.brief || {};\n\n// ─── Style profile from Gemini (nested inside style_profile) ───────────────\nconst styleProfile     = input.style_profile || {};\nconst extracted        = styleProfile.extracted_style || {};\nconst creativeUpgrades = styleProfile.creative_upgrades || {};\nconst designDirection  = styleProfile.final_design_direction || '';\n\n// ─── Text cleaner: strip emojis and double quotes that confuse image models ─\nfunction clean(text) {\n  if (!text) return '';\n  return String(text)\n    .replace(/[\\u{1F000}-\\u{1FFFF}]/gu, '')\n    .replace(/[\\u{2600}-\\u{27BF}]/gu, '')\n    .replace(/[\"“”]/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n// ─── Values from the sheet, with YOUR_BRAND fallbacks ─────────────────────────\nconst topicType      = clean(brief.topic_type)      || 'YOUR_DEFAULT_TOPIC';\nconst headline       = clean(brief.primary_subject) || 'YOUR_DEFAULT_HEADLINE';\nconst targetAudience = clean(brief.target_audience) || 'YOUR_DEFAULT_AUDIENCE';\nconst tone           = clean(brief.tone)            || 'YOUR_DEFAULT_TONE';\nconst cta            = clean(brief.cta)             || 'YOUR_DEFAULT_CTA';\nconst tagLine        = clean(brief.priceHook   || brief.price_hook)   || 'YOUR_DEFAULT_PRIMARY_HOOK';\nconst subLine        = clean(brief.outcomeHook || brief.outcome_hook) || 'YOUR_DEFAULT_OUTCOME_HOOK';\n\n// Up to 2 short support chips (only if provided; never padded with blanks)\nconst supportRaw = Array.isArray(brief.supportPoints)\n  ? brief.supportPoints\n  : String(brief.supportPoints || brief.support_points || brief.key_facts || '')\n      .split(/[,|\\n]/);\n\nconst chips = supportRaw\n  .map(clean)\n  .filter(s => s && s.length <= 28)   // keep only short phrases that render well\n  .slice(0, 2);\n\n// ─── Style hints from the analysis ─────────────────────────────────────────\nconst palette = (creativeUpgrades.suggested_color_palette || extracted.color_palette || [])\n  .filter(Boolean).join(', ');\n\nconst styleLines = [\n  designDirection && `MASTER DESIGN DIRECTION: ${designDirection}`,\n  palette && `Color palette: ${palette}`,\n  creativeUpgrades.visual_trend && `Visual trend: ${creativeUpgrades.visual_trend}`,\n  creativeUpgrades.layout_upgrade && `Layout idea: ${creativeUpgrades.layout_upgrade}`,\n  creativeUpgrades.background_style && `Background: ${creativeUpgrades.background_style}`,\n  creativeUpgrades.depth_technique && `Depth: ${creativeUpgrades.depth_technique}`,\n  creativeUpgrades.typography_upgrade && `Typography: ${creativeUpgrades.typography_upgrade}`,\n  creativeUpgrades.cta_upgrade && `CTA style: ${creativeUpgrades.cta_upgrade}`,\n].filter(Boolean).join('\\n');\n\n// ─── Text block: only what will actually be rendered ──────────────────────\nconst textLines = [\n  `- Headline (largest text): \"${headline}\"`,\n  `- Sub-line (medium): \"${subLine}\"`,\n  `- Small tag or sticker: \"${tagLine}\"`,\n  ...chips.map((c, i) => `- Small chip ${i + 1}: \"${c}\"`),\n  `- CTA button: \"${cta}\"`,\n].join('\\n');\n\n// ─── Prompt ────────────────────────────────────────────────────────────────\nconst promptText = `\nCreate a square 1:1 social media post for Instagram and Facebook for YOUR_BRAND.\n\nABOUT YOUR_BRAND:\nYOUR_PRODUCT_DESCRIPTION\nTaglines: YOUR_TAGLINES\nYOUR_BRAND_POSITIONING\n\nPOST TOPIC: ${topicType}\nAUDIENCE: ${targetAudience}\nTONE: ${tone}\n\nVISUAL STORY:\n- YOUR_SUBJECTS_AND_SCENE\n- YOUR_DESIRED_FEELING\n- YOUR_PHOTOGRAPHY_STYLE\n- YOUR_OPTIONAL_BRAND_MOTIFS (max 1-2)\n- YOUR_THINGS_TO_AVOID\n\n${styleLines}\n\nLOGO:\n- The attached image is the exact YOUR_BRAND logo. Use it exactly as provided.\n- Place it in the top-left or top-right corner with comfortable padding on a calm area with good contrast.\n- Do NOT redraw, recolor, distort or recreate the logo, and do not add any other logo.\n\nLAYOUT:\nTOP     -> YOUR_BRAND logo in a corner\nCENTER  -> Hero subject with the headline in clear open space (sky, wall, or soft panel)\nBOTTOM  -> Sub-line, small tag/chips, and a rounded pill CTA button\n\nTEXT TO RENDER (exactly as written, nothing else):\n${textLines}\n\nTEXT RULES:\n- Render ONLY the text above. No extra words, captions, URLs, hashtags or labels.\n- Spell every word exactly. Use sentence case as written; do not convert to all caps.\n- Friendly, rounded, modern sans-serif typography, large and readable on a phone.\n- Never place text over faces.\n\nHARD CONSTRAINTS:\n- Clean, uncluttered, plenty of breathing space.\n- No watermarks, no gibberish text, no duplicated elements.\n- Natural anatomy, correct hands and faces.\n- Should feel like a warm, modern app brand post, not a sales flyer or brochure.\n`.trim();\n\n// ─── Gemini request body ───────────────────────────────────────────────────\nconst requestBody = {\n  contents: [{\n    parts: [\n      { text: promptText },\n      ...(input.logo_base64\n        ? [{ inline_data: { mime_type: input.logo_mime || 'image/png', data: input.logo_base64 } }]\n        : []),\n    ],\n  }],\n  generationConfig: {\n    responseModalities: ['IMAGE'],\n    imageConfig: { aspectRatio: '1:1' },\n  },\n};\n\nreturn [{\n  json: {\n    request_body: requestBody,\n    brief,\n    prompt_text: promptText,\n    style_profile_json_string: input.style_profile_json_string,\n    image_model: 'nano_banana',\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        432
+      ],
+      "id": "3aca1687-54c1-4804-adb8-600a50535ba1",
+      "name": "Build Nano Banana Payload"
+    },
+    {
+      "parameters": {
+        "jsCode": "const consolidated = $('Consolidate Results').first().json;\nconst imageUrl  = consolidated.generated_image_url;\nconst igCaption = consolidated.instagram_caption;\nconst fbCaption = consolidated.facebook_caption;\nconst altText   = consolidated.alt_text;\nconst subject   = consolidated.primary_subject;\nconst today     = consolidated.date;\n\n// Resume URL of the Wait node in THIS execution\nconst resumeUrl = $execution.resumeUrl;\nconst sep = resumeUrl.includes('?') ? '&' : '?';\nconst approveUrl    = `${resumeUrl}${sep}action=approve`;\nconst regenerateUrl = `${resumeUrl}${sep}action=regenerate`;\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f5f5f7;color:#1d1d1f;\">\n  <div style=\"background:white;border-radius:12px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,0.04);\">\n\n    <h1 style=\"margin:0 0 4px;font-size:22px;\">📣 YOUR_BRAND Daily Post Preview</h1>\n    <p style=\"margin:0 0 20px;color:#6e6e73;font-size:14px;\">${today} · ${subject}</p>\n\n    <img src=\"${imageUrl}\" alt=\"${altText}\"\n         style=\"width:100%;max-width:584px;border-radius:8px;display:block;margin-bottom:24px;\" />\n\n    <h3 style=\"margin:24px 0 8px;font-size:16px;\">📷 Instagram Caption</h3>\n    <div style=\"background:#f5f5f7;padding:16px;border-radius:8px;white-space:pre-wrap;font-size:14px;line-height:1.5;\">${igCaption}</div>\n\n    <h3 style=\"margin:24px 0 8px;font-size:16px;\">👍 Facebook Caption</h3>\n    <div style=\"background:#f5f5f7;padding:16px;border-radius:8px;white-space:pre-wrap;font-size:14px;line-height:1.5;\">${fbCaption}</div>\n\n    <h3 style=\"margin:24px 0 8px;font-size:16px;\">♿ Alt Text</h3>\n    <div style=\"background:#f5f5f7;padding:12px;border-radius:8px;font-size:13px;color:#6e6e73;\">${altText}</div>\n\n    <div style=\"margin-top:32px;text-align:center;\">\n      <a href=\"${approveUrl}\"\n         style=\"display:inline-block;background:#34c759;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px;\">\n        ✓ Approve &amp; Schedule\n      </a>\n      <a href=\"${regenerateUrl}\"\n         style=\"display:inline-block;background:#ff3b30;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px;\">\n        ↻ Regenerate\n      </a>\n    </div>\n\n    <p style=\"margin-top:24px;text-align:center;color:#86868b;font-size:12px;\">\n      Approve schedules the post on Instagram + Facebook at the posting time in the sheet.<br/>\n      Regenerate discards this version and creates a new one.<br/>\n      These buttons only work for this run.\n    </p>\n\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    to: 'you@example.com',\n    subject: `📣 YOUR_BRAND Post Preview: ${subject}`,\n    html,\n    primary_subject: subject,\n    date: today,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        336
+      ],
+      "id": "cb2f5545-fe6e-46fe-b481-4372ce0bd0ca",
+      "name": "Build Email Content"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "=Post:{{ $('Read Today\\'s Brief').item.json['post#'] }} -  {{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2416,
+        336
+      ],
+      "id": "369c9fdd-e8cd-4677-8cc3-bb3842baf868",
+      "name": "Send a message"
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "mediaUrl": "={{ $('Write Back to Sheet').item.json.generated_image_url }}"
+      },
+      "type": "@blotato/n8n-nodes-blotato.blotato",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        48
+      ],
+      "id": "f38057ef-4b68-43db-a459-f3fba1e3d273",
+      "name": "Upload media"
+    },
+    {
+      "parameters": {
+        "accountId": {
+          "__rl": true,
+          "value": "YOUR_INSTAGRAM_ACCOUNT_ID",
+          "mode": "list",
+          "cachedResultName": "YOUR_INSTAGRAM_ACCOUNT"
+        },
+        "postContentText": "={{ $('Write Back to Sheet').item.json.instagram_caption }}",
+        "postContentMediaUrls": "={{ $json.url }}",
+        "options": {
+          "instagramAltText": "={{ $('Write Back to Sheet').item.json.alt_text }}",
+          "instagramMediaType": "reel",
+          "scheduledTime": "={{ $('Read Today\\'s Brief').item.json.posting_date_UTC }}"
+        }
+      },
+      "type": "@blotato/n8n-nodes-blotato.blotato",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        144
+      ],
+      "id": "a2677869-31b5-4205-bed5-ac53423be943",
+      "name": "Instagram POST",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const brief = $(\"Read Today's Brief\").first().json;\n\n// ─── Sheet fields with YOUR_BRAND-friendly fallbacks ──────────────────────────\nconst topicType      = brief.topic_type      || 'YOUR_DEFAULT_TOPIC';\nconst primarySubject = brief.primary_subject || 'YOUR_DEFAULT_MAIN_MESSAGE';\nconst keyFacts       = brief.key_facts       || '';\nconst targetAudience = brief.target_audience || 'YOUR_DEFAULT_AUDIENCE';\nconst tone           = brief.tone            || 'YOUR_DEFAULT_TONE';\nconst cta            = brief.cta             || 'YOUR_DEFAULT_CTA';\nconst priceHook      = brief.priceHook   || brief.price_hook   || 'YOUR_DEFAULT_PRIMARY_HOOK';\nconst outcomeHook    = brief.outcomeHook || brief.outcome_hook || 'YOUR_DEFAULT_OUTCOME_HOOK';\nconst supportPoints  = brief.supportPoints || brief.support_points || keyFacts;\n\n// ─── Brand context (from YOUR_DOMAIN) ─────────────────────────────────────\nconst brandContext = `\nBRAND: YOUR_BRAND (YOUR_DOMAIN)\nWHAT IT IS: YOUR_PRODUCT_DESCRIPTION\nHOW IT WORKS: YOUR_HOW_IT_WORKS\nTAGLINES: YOUR_TAGLINES\nVALUES: YOUR_BRAND_VALUES\nEMOTIONAL CORE: YOUR_EMOTIONAL_CORE\nAPP LINK: https://YOUR_APP_URL/\n`.trim();\n\nconst promptText = `You are the social media copywriter for YOUR_BRAND. Write an Instagram caption and a Facebook caption for today's post.\n\n${brandContext}\n\nTODAY'S POST:\n- Topic type: ${topicType}\n- Main message: ${primarySubject}\n- Key facts: ${keyFacts}\n- Target audience: ${targetAudience}\n- Tone: ${tone}\n- Primary hook: ${priceHook}\n- Outcome hook: ${outcomeHook}\n- Proof points: ${supportPoints}\n- CTA: ${cta}\n\nRULES:\n- Only state facts given above. Do NOT invent features, statistics, partners, prices or testimonials.\n- Do NOT include any hashtags; they are added separately.\n- Speak to the student directly (\"you\"). Warm and human, never corporate or salesy.\n- Emojis allowed but sparing (max 3 per caption), e.g. YOUR_EMOJI_EXAMPLES.\n- Use line breaks between short paragraphs for mobile readability.\n\nINSTAGRAM CAPTION:\n- Line 1: a scroll-stopping emotional hook tied to \"${topicType}\" (under 12 words, works before the \"more\" cut-off).\n- Then 1-2 short paragraphs built on \"${priceHook}\" and \"${outcomeHook}\".\n- End with the CTA and \"Link in bio\" (links are not clickable on Instagram).\n- 300-600 characters total.\n\nFACEBOOK CAPTION:\n- Slightly more conversational and explanatory than Instagram; can briefly explain how YOUR_BRAND works.\n- Opening line should invite engagement (a question or relatable moment).\n- End with the CTA followed by the full link https://YOUR_APP_URL/ (clickable on Facebook).\n- 400-800 characters total.\n\nALT TEXT:\n- Under 125 characters, describing the generated post image for accessibility.\n\nOutput strict JSON only, no markdown fences:\n{\n  \"instagram_caption\": \"...\",\n  \"facebook_caption\": \"...\",\n  \"alt_text\": \"...\"\n}`;\n\nconst requestBody = {\n  contents: [{ parts: [{ text: promptText }] }],\n  generationConfig: {\n    temperature: 0.6,\n    responseMimeType: \"application/json\",\n  },\n};\n\nreturn [{ json: { request_body: requestBody } }];"
+      },
+      "id": "496a6299-86f8-494c-9007-4a3c803af1ce",
+      "name": "build captions payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        336
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst brief = input.brief || {};\nconst styleProfile = input.style_profile || {};\nconst creativeUpgrades = input.creative_upgrades || {};\nconst designDirection = input.design_direction || '';\n\n// ─── Pull all values from Google Sheet via brief ───────────────────────────\n\nconst topicType      = brief.topic_type      || 'YOUR_DEFAULT_TOPIC';\nconst primarySubject = brief.primary_subject || 'YOUR_DEFAULT_HEADLINE';\nconst targetAudience = brief.target_audience || 'YOUR_DEFAULT_AUDIENCE';\nconst tone           = brief.tone            || 'YOUR_DEFAULT_TONE';\nconst cta            = brief.cta             || 'YOUR_DEFAULT_CTA';\nconst priceHook      = brief.priceHook       || brief.price_hook   || 'YOUR_DEFAULT_PRIMARY_HOOK';\nconst outcomeHook    = brief.outcomeHook      || brief.outcome_hook || 'YOUR_DEFAULT_OUTCOME_HOOK';\n\n// key_facts — handles string or array\nconst keyFactsRaw = Array.isArray(brief.key_facts)\n  ? brief.key_facts\n  : String(brief.key_facts || '').split(/[,\\n]/).map(s => s.trim()).filter(Boolean);\n\n// supportPoints — handles string, array, or falls back to key_facts\nconst supportPointsRaw = Array.isArray(brief.supportPoints)\n  ? brief.supportPoints\n  : Array.isArray(brief.support_points)\n    ? brief.support_points\n    : String(brief.supportPoints || brief.support_points || '')\n        .split(/[,\\n]/).map(s => s.trim()).filter(Boolean);\n\nconst supportPoints = (supportPointsRaw.length ? supportPointsRaw : keyFactsRaw)\n  .map(v => String(v).trim().toUpperCase())\n  .filter(Boolean)\n  .slice(0, 4);\n\nwhile (supportPoints.length < 4) supportPoints.push('');\n\n// ─── Style context ─────────────────────────────────────────────────────────\n\nconst styleHint = designDirection\n  ? `MASTER DESIGN DIRECTION: ${designDirection}`\n  : styleProfile && Object.keys(styleProfile).length\n    ? `Style inspiration only — never copy layout or branding: ${JSON.stringify(styleProfile)}`\n    : '';\n\nconst upgradeHint = creativeUpgrades && Object.keys(creativeUpgrades).length\n  ? `Apply these creative upgrades:\n- Visual trend: ${creativeUpgrades.visual_trend || ''}\n- Color palette: ${(creativeUpgrades.suggested_color_palette || []).join(', ')}\n- Depth technique: ${creativeUpgrades.depth_technique || ''}\n- Background style: ${creativeUpgrades.background_style || ''}\n- Mood: ${creativeUpgrades.mood_upgrade || ''}`\n  : '';\n\n// ─── Sanitize text — remove emojis that break GPT image API ───────────────\n\nfunction sanitize(text) {\n  if (!text) return '';\n  return String(text)\n    .replace(/[\\u{1F000}-\\u{1FFFF}]/gu, '')\n    .replace(/[\\u{2700}-\\u{27BF}]/gu, '')\n    .replace(/[\\u{2600}-\\u{26FF}]/gu, '')\n    .replace(/\\u2705/gu, '')\n    .replace(/[\\u{1F300}-\\u{1F9FF}]/gu, '')\n    .trim();\n}\n\n// ─── Build the prompt ──────────────────────────────────────────────────────\n\nconst prompt = `\nCreate a premium, high-converting Instagram feed advertisement for YOUR_BUSINESS_TYPE.\n\nCAMPAIGN OBJECTIVE:\nStop the scroll instantly. Create immediate aspiration and drive inquiries from ${sanitize(targetAudience)}.\nThis must feel like a top-performing Meta ad — not a flyer, not a brochure.\n\nOFFER PSYCHOLOGY:\nThe viewer must instantly understand three things:\n1. What is the offer? — ${sanitize(primarySubject)}\n2. Why now? — ${sanitize(priceHook)}\n3. What do I gain? — ${sanitize(outcomeHook)}\n\nTOPIC:\n${sanitize(topicType)}\n\nTONE:\n${sanitize(tone)}\n\n${styleHint}\n${upgradeHint}\n\nVISUAL SUBJECT:\n- Feature ONE YOUR_SUBJECT who represents \"${sanitize(targetAudience)}\".\n- Natural expression, premium editorial photography, luxury cinematic lighting.\n- Background should fit YOUR_BRAND_SETTING.\n- Soft cinematic blur, premium atmosphere, zero clutter.\n- Avoid stock-photo look — this must feel like a real campaign shoot.\n\nLOGO PLACEMENT — CRITICAL:\n- The attached image is the EXACT company logo — use it precisely as provided.\n- Do NOT redraw, recreate, hallucinate, recolor, or stylize the logo in any way.\n- Place the EXACT attached logo in the TOP-LEFT or TOP-RIGHT corner.\n- Use proper padding — logo should feel premium and balanced, not squeezed.\n- Choose a background color or region behind the logo that gives maximum contrast.\n- The logo must be clearly readable at Instagram feed size.\n\nCOMPOSITION:\n- Square 1:1 Instagram format\n- Strong single focal point\n- Generous whitespace\n- Premium visual hierarchy\n- Everything must be readable at mobile screen size\n\nLAYOUT (strict top to bottom):\nTOP     → Exact logo anchored top-left or top-right\nCENTER  → Hero student + large bold main headline\nMIDDLE  → WOW FACTOR: \"${sanitize(priceHook)}\" in largest highlight area\n          SECONDARY: \"${sanitize(outcomeHook)}\"\nBOTTOM  → 4 short benefit badges + CTA button\n\nRENDER THIS TEXT EXACTLY (no paraphrasing, no changes):\n- Main headline:  \"${sanitize(primarySubject)}\"\n- WOW badge:      \"${sanitize(priceHook)}\"\n- Outcome badge:  \"${sanitize(outcomeHook)}\"\n- Benefit 1:      \"${sanitize(supportPoints[0])}\"\n- Benefit 2:      \"${sanitize(supportPoints[1])}\"\n- Benefit 3:      \"${sanitize(supportPoints[2])}\"\n- Benefit 4:      \"${sanitize(supportPoints[3])}\"\n- CTA button:     \"${sanitize(cta)}\"\n\nTEXT STYLE:\n- Very large bold headline — dominant and immediate\n- Short badge text — all caps, high contrast\n- No paragraphs, no body copy, no small print\n- Maximum readability at a glance\n- Luxury social media typography\n\nDESIGN STYLE:\n- Premium vivid gradients — no flat or muted backgrounds\n- Cinematic editorial lighting on the student\n- Glassmorphism or liquid-glass highlight cards for badges\n- Layered depth — shadows, translucent overlapping shapes\n- Clean whitespace that breathes\n- Emotional visual storytelling\n- Commercial advertising quality — award-winning feel\n\nHARD CONSTRAINTS:\n- No brochure design\n- No crowded layout\n- No small unreadable text\n- No watermarks\n- No gibberish or placeholder text\n- No spelling mistakes\n- No distorted anatomy or extra fingers\n- No duplicated elements\n- No template look\n- No logo recreation — use ONLY the exact attached logo\n- Output must look like a premium high-performing Meta ad creative\n`.trim();\n\n// ─── Return for n8n ────────────────────────────────────────────────────────\n\nreturn [{\n  json: {\n    prompt,\n    logo_base64: input.logo_base64,\n    logo_mime: input.logo_mime,\n    brief,\n    style_profile_json_string: input.style_profile_json_string,\n    image_model: \"openai\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        240
+      ],
+      "id": "f3182756-88b9-43f5-89ee-11846b650506",
+      "name": "Build Openai Payload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-brief",
+              "leftValue": "={{ $('Read Today\\'s Brief').item.json.image_model }}",
+              "rightValue": "openai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4b8dfa2-a33c-4328-ae18-b62d126ad169",
+      "name": "model selection",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst brief = $('Build Openai Payload').first().json.brief;\nconst styleJson = $('Build Openai Payload').first().json.style_profile_json_string;\nconst today = new Date().toISOString().split('T')[0];\nconst filename = `post_${today}_${(brief.primary_subject || 'post')\n  .replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}.png`;\n\n// Native node stores image as binary reference — pass it through directly\nreturn [{\n  json: {\n    brief,\n    style_profile_json_string: styleJson,\n    filename,\n    today,\n    row_number: brief.row_number,\n    image_model: \"openai\"\n  },\n  binary: {\n    data: input.binary.data  // pass the binary reference as-is\n  }\n}];"
+      },
+      "id": "6f4beb83-d289-4ab8-95fa-49c3c82fe990",
+      "name": "Extract Gen openai Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\n// ─── 1. Prompt blocked before generation ───────────────────────────────────\nif (!response.candidates || !response.candidates[0]) {\n  const blockReason = response.promptFeedback?.blockReason;\n  throw new Error(\n    blockReason\n      ? `Image prompt blocked by Gemini: ${blockReason}`\n      : `Image generation failed. Response: ${JSON.stringify(response).slice(0, 500)}`\n  );\n}\n\nconst candidate = response.candidates[0];\nconst parts = candidate.content?.parts || [];\n\n// ─── 2. Pick the final image (skip interim \"thought\" images) ───────────────\nconst imageParts = parts.filter(p => (p.inline_data || p.inlineData) && !p.thought);\nconst imagePart  = imageParts[imageParts.length - 1];\n\nif (!imagePart) {\n  const textReply = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 300);\n  throw new Error(\n    `Gemini returned no image. finishReason: ${candidate.finishReason || 'unknown'}` +\n    (textReply ? ` | Model said: ${textReply}` : '')\n  );\n}\n\nconst inline   = imagePart.inline_data || imagePart.inlineData;\nconst imageData = inline.data;\nconst mimeType  = inline.mime_type || inline.mimeType || 'image/png';\n\nif (!imageData || imageData.length < 1000) {\n  throw new Error('Gemini returned an empty or invalid image.');\n}\n\n// ─── 3. Context + filename ─────────────────────────────────────────────────\nconst parsed    = $('Parse Style Profile').first().json;\nconst brief     = parsed.brief || {};\nconst styleJson = parsed.style_profile_json_string;\n\nconst now   = new Date();\nconst today = now.toISOString().split('T')[0];\nconst time  = now.toISOString().slice(11, 16).replace(':', '');   // HHMM UTC\n\nconst ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg'\n          : mimeType.includes('webp') ? 'webp'\n          : 'png';\n\nconst slug = String(brief.primary_subject || 'post')\n  .replace(/[^a-zA-Z0-9]+/g, '_')\n  .replace(/^_|_$/g, '')\n  .slice(0, 40);\n\nconst postNo   = brief['post#'] ? `p${brief['post#']}_` : '';\nconst filename = `post_${postNo}${today}_${time}_${slug}.${ext}`;\n\n// ─── 4. Binary output ──────────────────────────────────────────────────────\nlet binaryData;\ntry {\n  binaryData = await this.helpers.prepareBinaryData(\n    Buffer.from(imageData, 'base64'), filename, mimeType\n  );\n} catch (e) {\n  // Fallback for environments without helpers\n  binaryData = { data: imageData, mimeType, fileName: filename, fileExtension: ext };\n}\n\nreturn [{\n  json: {\n    brief,\n    style_profile_json_string: styleJson,\n    filename,\n    today,\n    row_number: brief.row_number,\n    image_model: 'nano_banana',\n  },\n  binary: { data: binaryData },\n}];"
+      },
+      "id": "50130117-09f3-41d9-8b63-f9fef6fd4b20",
+      "name": "Extract Gen Gemini Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-image-1.5",
+          "mode": "list",
+          "cachedResultName": "GPT-IMAGE-1.5"
+        },
+        "prompt": "={{ $json.prompt }}",
+        "options": {
+          "quality": "medium"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        240
+      ],
+      "id": "dd8c0412-9300-4610-add3-082db64e8c3f",
+      "name": "Generate an image"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "YOUR_WEBHOOK_PATH",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2512,
+        432
+      ],
+      "id": "db3f8038-e27b-445c-a728-3d4a98b7c6f1",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_N8N_HOST/webhook/YOUR_WEBHOOK_PATH",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3760,
+        336
+      ],
+      "id": "b3b3ca78-0a2a-41e9-93ed-ddbaf10ff29b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    message: \"Regenerating your post — a new version will arrive in your inbox shortly.\",\n    date: $('Consolidate Results').first().json.date\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        336
+      ],
+      "id": "0060ba87-c25d-431b-ad6a-9ff08cee2680",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "=published",
+            "post#": "={{ $('Brief Exists?').item.json['post#'] }}"
+          },
+          "matchingColumns": [
+            "post#"
+          ],
+          "schema": [
+            {
+              "id": "post#",
+              "displayName": "post#",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_IST",
+              "displayName": "posting_date_IST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_UTC",
+              "displayName": "posting_date_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "topic_type",
+              "displayName": "topic_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "primary_subject",
+              "displayName": "primary_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "key_facts",
+              "displayName": "key_facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cta",
+              "displayName": "cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "priceHook",
+              "displayName": "priceHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outcomeHook",
+              "displayName": "outcomeHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tone",
+              "displayName": "tone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "image_model",
+              "displayName": "image_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_1",
+              "displayName": "reference_post_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_2",
+              "displayName": "reference_post_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "logo_url",
+              "displayName": "logo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "generated_image_url",
+              "displayName": "generated_image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "instagram_caption",
+              "displayName": "instagram_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "facebook_caption",
+              "displayName": "facebook_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "alt_text",
+              "displayName": "alt_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "style_profile_json",
+              "displayName": "style_profile_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ig_post_url",
+              "displayName": "ig_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tiktok_post_url",
+              "displayName": "tiktok_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_log",
+              "displayName": "error_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hashtags",
+              "displayName": "hashtags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "75871905-cf25-4bfe-9cdc-2394311f708a",
+      "name": "Write Back to Sheet_published",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3760,
+        144
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "post#": "={{ $('Brief Exists?').item.json['post#'] }}",
+            "status": "pending"
+          },
+          "matchingColumns": [
+            "post#"
+          ],
+          "schema": [
+            {
+              "id": "post#",
+              "displayName": "post#",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_IST",
+              "displayName": "posting_date_IST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_UTC",
+              "displayName": "posting_date_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "topic_type",
+              "displayName": "topic_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "primary_subject",
+              "displayName": "primary_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "key_facts",
+              "displayName": "key_facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cta",
+              "displayName": "cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "priceHook",
+              "displayName": "priceHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outcomeHook",
+              "displayName": "outcomeHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tone",
+              "displayName": "tone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "image_model",
+              "displayName": "image_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_1",
+              "displayName": "reference_post_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_2",
+              "displayName": "reference_post_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "logo_url",
+              "displayName": "logo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "generated_image_url",
+              "displayName": "generated_image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "instagram_caption",
+              "displayName": "instagram_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "facebook_caption",
+              "displayName": "facebook_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alt_text",
+              "displayName": "alt_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "style_profile_json",
+              "displayName": "style_profile_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ig_post_url",
+              "displayName": "ig_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tiktok_post_url",
+              "displayName": "tiktok_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "error_log",
+              "displayName": "error_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "hashtags",
+              "displayName": "hashtags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e173efd3-ca5f-478d-be2f-623efe6e8d78",
+      "name": "Write Back to Sheet_pending",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3312,
+        336
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "platform": "facebook",
+        "accountId": {
+          "__rl": true,
+          "value": "YOUR_FACEBOOK_ACCOUNT_ID",
+          "mode": "list",
+          "cachedResultName": "YOUR_FACEBOOK_ACCOUNT"
+        },
+        "postContentText": "={{ $('Write Back to Sheet').item.json.facebook_caption}}",
+        "postContentMediaUrls": "={{ $json.url }}",
+        "facebookPageId": {
+          "__rl": true,
+          "value": "YOUR_FACEBOOK_PAGE_ID",
+          "mode": "id"
+        },
+        "options": {
+          "scheduledTime": "={{ $('Brief Exists?').item.json.posting_date_UTC }}"
+        }
+      },
+      "type": "@blotato/n8n-nodes-blotato.blotato",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        -48
+      ],
+      "id": "d0959a29-e236-4d30-9d3b-723ce8b8464b",
+      "name": "Facebook Post"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        1072
+      ],
+      "id": "4e2d82d7-2c38-48d4-acd8-9eb91a3385ec",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\n\n// Extract error details\nconst failedNode = error.execution.lastNodeExecuted || 'Unknown node';\nconst errorMessage = error.execution.error?.message || 'No error message available';\nconst errorStack = error.execution.error?.stack || '';\nconst executionId = error.execution.id || '';\nconst workflowName = error.workflow.name || 'Social Automation';\nconst executionUrl = error.execution.url || `https://YOUR_N8N_HOST/execution/${executionId}`;\n\n// Get today's date for sheet reference\nconst today = new Date().toISOString().split('T')[0];\n\n// Try to get the brief date from Read Today's Brief if it ran\nlet briefDate = today;\nlet primarySubject = 'Unknown';\ntry {\n  const brief = $(\"Read Today's Brief\").first().json;\n  // Normalise date — strip time and timezone, keep only YYYY-MM-DD\n  const rawDate = brief.date || today;\n  briefDate = String(rawDate).split('T')[0].substring(0, 10);\n  primarySubject = brief.primary_subject || 'Unknown';\n} catch (e) {\n  // Read Today's Brief may not have run if error was early in pipeline\n  briefDate = today;\n}\n\n// Map node names to human readable descriptions and suggested fixes\nconst nodeGuidance = {\n  \"Read Today's Brief\": {\n    description: \"Failed to read from Google Sheet\",\n    fix: \"Check Google Sheets credentials and verify the sheet is accessible\"\n  },\n  \"Brief Exists?\": {\n    description: \"Brief validation failed\",\n    fix: \"Check that today's row has a primary_subject and status is pending\"\n  },\n  \"Download Ref Post 1\": {\n    description: \"Failed to download reference post 1 from Drive\",\n    fix: \"Check the reference_post_1 URL in the sheet is a valid Google Drive link\"\n  },\n  \"Download Ref Post 2\": {\n    description: \"Failed to download reference post 2 from Drive\",\n    fix: \"Check the reference_post_2 URL in the sheet is a valid Google Drive link\"\n  },\n  \"Download Logo\": {\n    description: \"Failed to download logo from Drive\",\n    fix: \"Check the logo_url in the sheet is a valid Google Drive link\"\n  },\n  \"Prepare Image Payloads\": {\n    description: \"Failed to prepare image data\",\n    fix: \"Check that all Extract nodes ran successfully and produced base64 data\"\n  },\n  \"Gemini: Extract Style Profile\": {\n    description: \"Gemini style extraction failed\",\n    fix: \"Check Gemini API key, quota limits, and that reference images are valid\"\n  },\n  \"Parse Style Profile\": {\n    description: \"Failed to parse Gemini style profile response\",\n    fix: \"Gemini may have returned malformed JSON — check the Gemini node output\"\n  },\n  \"Build Nano Banana Payload\": {\n    description: \"Failed to build Gemini image generation payload\",\n    fix: \"Check that brief and style_profile fields are present in upstream data\"\n  },\n  \"Nano Banana: Generate Post\": {\n    description: \"Gemini image generation failed\",\n    fix: \"Check Gemini API quota, model name, and request body format\"\n  },\n  \"Build Openai Payload\": {\n    description: \"Failed to build OpenAI image generation payload\",\n    fix: \"Check that brief and style_profile fields are present in upstream data\"\n  },\n  \"Generate an image\": {\n    description: \"OpenAI image generation failed\",\n    fix: \"Check OpenAI API key, account credits, and model access tier\"\n  },\n  \"Extract Gen Gemini Image\": {\n    description: \"Failed to extract generated image from Gemini response\",\n    fix: \"Gemini may not have returned an image — check the generation node output\"\n  },\n  \"Extract Gen openai Image\": {\n    description: \"Failed to extract generated image from OpenAI response\",\n    fix: \"OpenAI may not have returned an image — check the generation node output\"\n  },\n  \"Upload Image to Drive\": {\n    description: \"Failed to upload generated image to Google Drive\",\n    fix: \"Check Google Drive credentials and folder permissions\"\n  },\n  \"build captions payload\": {\n    description: \"Failed to build captions payload\",\n    fix: \"Check that Read Today's Brief ran and brief data is available\"\n  },\n  \"Gemini: Generate Captions\": {\n    description: \"Caption generation failed\",\n    fix: \"Check Gemini API key and quota limits\"\n  },\n  \"Consolidate Results\": {\n    description: \"Failed to consolidate results\",\n    fix: \"Check that both image extraction and caption generation completed successfully\"\n  },\n  \"Write Back to Sheet\": {\n    description: \"Failed to write results to Google Sheet\",\n    fix: \"Check Google Sheets credentials and that the date column matches today\"\n  },\n  \"Build Email Content\": {\n    description: \"Failed to build preview email\",\n    fix: \"Check Consolidate Results output has all required fields\"\n  },\n  \"Send a message\": {\n    description: \"Failed to send preview email via Gmail\",\n    fix: \"Check Gmail credentials and that the recipient email is valid\"\n  }\n};\n\nconst guidance = nodeGuidance[failedNode] || {\n  description: \"An unexpected error occurred\",\n  fix: \"Check the execution log for details\"\n};\n\n// Format time\nconst now = new Date();\nconst timeString = now.toLocaleString('en-IN', { \n  timeZone: 'Asia/Kolkata',\n  dateStyle: 'medium',\n  timeStyle: 'short'\n});\n\nconst html = `\n<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #f5f5f7; color: #1d1d1f;\">\n  <div style=\"background: white; border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);\">\n\n    <div style=\"display: flex; align-items: center; margin-bottom: 20px;\">\n      <div style=\"background: #ff3b30; border-radius: 8px; padding: 8px 14px; color: white; font-weight: 600; font-size: 14px; margin-right: 12px;\">\n        FAILED\n      </div>\n      <h1 style=\"margin: 0; font-size: 20px; color: #1d1d1f;\">Social Automation Error</h1>\n    </div>\n\n    <p style=\"margin: 0 0 24px; color: #6e6e73; font-size: 14px;\">${timeString} IST &nbsp;·&nbsp; ${workflowName}</p>\n\n    <div style=\"background: #fff5f5; border: 1px solid #ffcdd2; border-radius: 8px; padding: 16px; margin-bottom: 20px;\">\n      <p style=\"margin: 0 0 6px; font-size: 12px; color: #c62828; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;\">Failed Node</p>\n      <p style=\"margin: 0; font-size: 16px; font-weight: 600; color: #1d1d1f;\">${failedNode}</p>\n      <p style=\"margin: 4px 0 0; font-size: 14px; color: #6e6e73;\">${guidance.description}</p>\n    </div>\n\n    <div style=\"background: #f5f5f7; border-radius: 8px; padding: 16px; margin-bottom: 20px;\">\n      <p style=\"margin: 0 0 6px; font-size: 12px; color: #6e6e73; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;\">Error Message</p>\n      <p style=\"margin: 0; font-size: 13px; color: #1d1d1f; font-family: monospace; word-break: break-word;\">${errorMessage}</p>\n    </div>\n\n    <div style=\"background: #f0f9ff; border: 1px solid #b3d9ff; border-radius: 8px; padding: 16px; margin-bottom: 20px;\">\n      <p style=\"margin: 0 0 6px; font-size: 12px; color: #0066cc; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;\">Suggested Fix</p>\n      <p style=\"margin: 0; font-size: 14px; color: #1d1d1f;\">${guidance.fix}</p>\n    </div>\n\n    <div style=\"border-top: 1px solid #f0f0f0; padding-top: 16px; margin-bottom: 20px;\">\n      <table style=\"width: 100%; border-collapse: collapse;\">\n        <tr>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #6e6e73; width: 140px;\">Post date</td>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #1d1d1f;\">${briefDate}</td>\n        </tr>\n        <tr>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #6e6e73;\">Primary subject</td>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #1d1d1f;\">${primarySubject}</td>\n        </tr>\n        <tr>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #6e6e73;\">Execution ID</td>\n          <td style=\"padding: 6px 0; font-size: 13px; color: #1d1d1f;\">${executionId}</td>\n        </tr>\n      </table>\n    </div>\n\n    <div style=\"text-align: center; margin-bottom: 24px;\">\n      <a href=\"${executionUrl}\" \n         style=\"display: inline-block; background: #007aff; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;\">\n        View Failed Execution\n      </a>\n    </div>\n\n    <div style=\"background: #fffbf0; border: 1px solid #ffe082; border-radius: 8px; padding: 14px;\">\n      <p style=\"margin: 0 0 8px; font-size: 12px; color: #856404; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;\">Next Steps</p>\n      <ol style=\"margin: 0; padding-left: 18px; font-size: 13px; color: #1d1d1f; line-height: 1.8;\">\n        <li>Click \"View Failed Execution\" above to see exactly what went wrong</li>\n        <li>Fix the issue using the suggested fix above</li>\n        <li>Open the Google Sheet and confirm row for ${briefDate} still has status: <strong>pending</strong></li>\n        <li>Manually trigger the workflow or wait for tomorrow's scheduled run</li>\n      </ol>\n    </div>\n\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    to: 'you@example.com',\n    subject: `❌ Automation Failed — ${failedNode} — ${primarySubject}`,\n    html,\n    // Also pass structured data for the sheet error log\n    error_log: `[${timeString}] Node: ${failedNode} | Error: ${errorMessage}`,\n    date: briefDate\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2288,
+        1072
+      ],
+      "id": "60ab6eae-785b-471e-a272-63641c7abc03",
+      "name": "Build error email"
+    },
+    {
+      "parameters": {
+        "sendTo": "you@example.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2064,
+        976
+      ],
+      "id": "600a0da9-a10c-4be3-9d35-6d2435d1e3e3",
+      "name": "Send Error Alert"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "error_log": "={{ $('Error Trigger').item.json.execution.error.message }}",
+            "date": "={{ $today.toFormat('yyyy-MM-dd') }}"
+          },
+          "matchingColumns": [
+            "date"
+          ],
+          "schema": [
+            {
+              "id": "post#",
+              "displayName": "post#",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "posting_date_IST",
+              "displayName": "posting_date_IST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posting_date_UTC",
+              "displayName": "posting_date_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "topic_type",
+              "displayName": "topic_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "primary_subject",
+              "displayName": "primary_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "key_facts",
+              "displayName": "key_facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "cta",
+              "displayName": "cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "priceHook",
+              "displayName": "priceHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outcomeHook",
+              "displayName": "outcomeHook",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tone",
+              "displayName": "tone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "image_model",
+              "displayName": "image_model",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_1",
+              "displayName": "reference_post_1",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reference_post_2",
+              "displayName": "reference_post_2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "logo_url",
+              "displayName": "logo_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "generated_image_url",
+              "displayName": "generated_image_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "instagram_caption",
+              "displayName": "instagram_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "facebook_caption",
+              "displayName": "facebook_caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alt_text",
+              "displayName": "alt_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "style_profile_json",
+              "displayName": "style_profile_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ig_post_url",
+              "displayName": "ig_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "facebook_post_url",
+              "displayName": "facebook_post_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "error_log",
+              "displayName": "error_log",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "hashtags",
+              "displayName": "hashtags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "53529a5f-78a9-40f8-817c-5d247f8d0265",
+      "name": "Write error to sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2064,
+        1168
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4637f387-57d3-4816-b83c-f63f4b0add24",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "published",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "4e1408c1-88bf-4806-ad04-07e0a6e0a8ca",
+              "leftValue": "={{ $('Instagram POST').item.json.postSubmissionId }}",
+              "rightValue": "Null",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3984,
+        144
+      ],
+      "id": "4672bf54-88b1-4a67-8262-fe06c1351f63",
+      "name": "If",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "responseMode": "responseNode",
+        "limitWaitTime": true,
+        "resumeAmount": 8,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        336
+      ],
+      "id": "2b393c9e-30fe-47b0-b6f5-952850f08d70",
+      "name": "Wait_for_ACK"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.query?.action || 'timeout' }}",
+                    "rightValue": "approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5de60a9d-abb1-474a-8303-3676124ffd70"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "892f9036-a55f-4e9f-a68a-e37df6f769f2",
+                    "leftValue": "={{ $json.query?.action || 'timeout' }}",
+                    "rightValue": "regenerate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "regenerate"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2864,
+        320
+      ],
+      "id": "1fbbaccf-a26b-433c-9f91-4fe8721f6c67",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "=you@example.com",
+        "subject": "={{ '⏰ Still awaiting approval — ' + $('Consolidate Results').first().json.primary_subject }}",
+        "message": "=={{ `\n<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f5f5f7;color:#1d1d1f;\">\n  <div style=\"background:#fff;border-radius:12px;padding:28px;\">\n    <h2 style=\"margin:0 0 8px;font-size:18px;\">⏰ Post not approved yet</h2>\n    <p style=\"margin:0 0 16px;color:#6e6e73;font-size:14px;\">\n      ${$('Consolidate Results').first().json.date} · ${$('Consolidate Results').first().json.primary_subject}\n    </p>\n    <img src=\"${$('Consolidate Results').first().json.generated_image_url}\"\n         style=\"width:100%;border-radius:8px;display:block;margin-bottom:16px;\" />\n    <p style=\"font-size:14px;line-height:1.5;\">\n      The approval window closed before anyone responded. Nothing was published.\n      The post is still saved with status <strong>generated</strong>.\n    </p>\n    <p style=\"font-size:14px;line-height:1.5;\">\n      To act on it, open the workflow and re-run, or edit the row in the\n      <a href=\"https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit\">posts sheet</a>.\n    </p>\n  </div>\n</div>` }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3088,
+        528
+      ],
+      "id": "cfdd3d0e-33bb-42b5-a07c-c61edaf226f0",
+      "name": "Send a message1"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "   <div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:80px auto;text-align:center;\">\n     <h1 style=\"font-size:48px;margin:0;\">✅</h1>\n     <h2>Post approved</h2>\n     <p style=\"color:#6e6e73;\">It's being scheduled on Instagram and Facebook. You can close this tab.</p>\n   </div>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3088,
+        48
+      ],
+      "id": "09dd782d-f113-443b-a01e-95b2637613ab",
+      "name": "Respond_Approved"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:80px auto;text-align:center;\">\n  <h1 style=\"font-size:48px;margin:0;\">🔄</h1>\n  <h2>Regenerating</h2>\n  <p style=\"color:#6e6e73;\">A new version will arrive in your inbox shortly. You can close this tab.</p>\n</div>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3088,
+        336
+      ],
+      "id": "3a2e9da8-d282-4d9e-9c57-31b5286eb475",
+      "name": "Respond_Regenerate"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Trigger 11:30 AM": {
+      "main": [
+        [
+          {
+            "node": "Read Today's Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Today's Brief": {
+      "main": [
+        [
+          {
+            "node": "Brief Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brief Exists?": {
+      "main": [
+        [
+          {
+            "node": "Download Ref Post 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Ref Post 1": {
+      "main": [
+        [
+          {
+            "node": "Extract Ref 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Ref Post 2": {
+      "main": [
+        [
+          {
+            "node": "Extract Ref 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Logo": {
+      "main": [
+        [
+          {
+            "node": "Extract Logo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Image Payloads": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Extract Style Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Extract Style Profile": {
+      "main": [
+        [
+          {
+            "node": "Parse Style Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Parse Style Profile": {
+      "main": [
+        [
+          {
+            "node": "model selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nano Banana: Generate Post": {
+      "main": [
+        [
+          {
+            "node": "Extract Gen Gemini Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Upload Image to Drive": {
+      "main": [
+        [
+          {
+            "node": "build captions payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Generate Captions": {
+      "main": [
+        [
+          {
+            "node": "Consolidate Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Consolidate Results": {
+      "main": [
+        [
+          {
+            "node": "Write Back to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Ref 1": {
+      "main": [
+        [
+          {
+            "node": "Download Ref Post 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Ref 2": {
+      "main": [
+        [
+          {
+            "node": "Download Logo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Logo": {
+      "main": [
+        [
+          {
+            "node": "Prepare Image Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Nano Banana Payload": {
+      "main": [
+        [
+          {
+            "node": "Nano Banana: Generate Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Build Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Wait_for_ACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload media": {
+      "main": [
+        [
+          {
+            "node": "Instagram POST",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build captions payload": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Generate Captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "model selection": {
+      "main": [
+        [
+          {
+            "node": "Build Openai Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Nano Banana Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Openai Payload": {
+      "main": [
+        [
+          {
+            "node": "Generate an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Gen openai Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Gen Gemini Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate an image": {
+      "main": [
+        [
+          {
+            "node": "Extract Gen openai Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Today's Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram POST": {
+      "main": [
+        [
+          {
+            "node": "Write Back to Sheet_published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build error email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build error email": {
+      "main": [
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write error to sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Post": {
+      "main": [
+        []
+      ]
+    },
+    "Write Back to Sheet_published": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        []
+      ]
+    },
+    "Wait_for_ACK": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Respond_Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond_Regenerate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back to Sheet_pending": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond_Approved": {
+      "main": [
+        [
+          {
+            "node": "Upload media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond_Regenerate": {
+      "main": [
+        [
+          {
+            "node": "Write Back to Sheet_pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timezone": "Asia/Kolkata",
+    "executionTimeout": -1
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
